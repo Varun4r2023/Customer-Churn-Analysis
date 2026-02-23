@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChurnIQ — Telecom Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f1a;--surface:#111827;--surface2:#1a2235;--surface3:#1f2b40;
+  --border:#1e2d45;--border2:#263350;
+  --text:#e8edf5;--text-muted:#7a8ba8;--text-dim:#4a5a72;
+  --accent:#3b82f6;--accent2:#60a5fa;--accent-glow:rgba(59,130,246,0.15);
+  --danger:#ef4444;--warning:#f59e0b;--success:#10b981;
+  --purple:#8b5cf6;--teal:#14b8a6;--orange:#f97316;
+  --card-shadow:0 4px 24px rgba(0,0,0,0.4);
+  --transition:all 0.22s cubic-bezier(0.4,0,0.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* ── UPLOAD SCREEN ── */
+#uploadScreen{
+  position:fixed;inset:0;background:var(--bg);z-index:500;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:0;
+  transition:opacity 0.4s ease,transform 0.4s ease;
+}
+#uploadScreen.hidden{opacity:0;pointer-events:none;transform:scale(0.97)}
+
+.upload-wrap{
+  width:100%;max-width:580px;
+  display:flex;flex-direction:column;align-items:center;
+  padding:28px;
+}
+
+.upload-logo{
+  font-family:'Playfair Display',serif;
+  font-size:38px;font-weight:800;color:var(--text);
+  margin-bottom:6px;letter-spacing:-0.03em;
+}
+.upload-logo span{color:var(--accent2)}
+
+.upload-tagline{
+  font-size:13px;color:var(--text-dim);
+  margin-bottom:36px;letter-spacing:0.02em;
+  font-family:'DM Mono',monospace;
+}
+
+.drop-zone{
+  width:100%;
+  border:2px dashed var(--border2);
+  border-radius:16px;
+  background:var(--surface);
+  padding:44px 28px;
+  text-align:center;
+  cursor:pointer;
+  transition:var(--transition);
+  position:relative;
+  margin-bottom:20px;
+}
+.drop-zone:hover,.drop-zone.drag-over{
+  border-color:var(--accent);
+  background:var(--accent-glow);
+}
+.drop-zone input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.drop-icon{
+  font-size:40px;margin-bottom:14px;
+  filter:grayscale(0.4);
+}
+.drop-title{
+  font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;
+}
+.drop-sub{
+  font-size:12px;color:var(--text-muted);margin-bottom:16px;
+}
+.drop-formats{
+  display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+}
+.format-pill{
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text-muted);padding:4px 12px;border-radius:20px;
+  font-size:11px;font-weight:600;font-family:'DM Mono',monospace;
+  letter-spacing:0.05em;
+}
+.format-pill.csv{color:#10b981;border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.08)}
+.format-pill.xlsx{color:#3b82f6;border-color:rgba(59,130,246,0.3);background:rgba(59,130,246,0.08)}
+.format-pill.json{color:#f59e0b;border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.08)}
+.format-pill.tsv{color:#8b5cf6;border-color:rgba(139,92,246,0.3);background:rgba(139,92,246,0.08)}
+
+/* Column mapping UI */
+#mappingPanel{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:22px 24px;
+  display:none;
+  margin-bottom:16px;
+}
+#mappingPanel.show{display:block}
+
+.mapping-title{
+  font-size:13px;font-weight:600;color:var(--text);
+  margin-bottom:4px;display:flex;align-items:center;gap:8px;
+}
+.mapping-sub{font-size:11px;color:var(--text-dim);margin-bottom:18px}
+
+.mapping-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  margin-bottom:16px;
+}
+@media(max-width:500px){.mapping-grid{grid-template-columns:1fr}}
+
+.mapping-row{display:flex;flex-direction:column;gap:5px}
+.mapping-label{
+  font-size:10px;font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:0.07em;
+  display:flex;align-items:center;gap:5px;
+}
+.mapping-label .req{color:var(--danger);font-size:9px}
+.mapping-label .opt{color:var(--text-dim);font-size:9px}
+.mapping-select{
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);padding:7px 28px 7px 10px;border-radius:8px;
+  font-size:12px;font-family:'DM Sans',sans-serif;
+  cursor:pointer;outline:none;transition:var(--transition);
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8ba8'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+  width:100%;
+}
+.mapping-select:focus{border-color:var(--accent)}
+.mapping-select.auto-matched{border-color:rgba(16,185,129,0.4);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2310b981'/%3E%3C/svg%3E");}
+
+.file-info-bar{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px;
+}
+.file-info-icon{font-size:20px}
+.file-info-name{font-size:13px;font-weight:600;color:var(--text)}
+.file-info-meta{font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;margin-top:2px}
+.file-info-change{margin-left:auto;font-size:11px;color:var(--accent2);cursor:pointer;text-decoration:underline}
+
+.upload-btn{
+  width:100%;background:var(--accent);border:none;color:#fff;
+  padding:13px 20px;border-radius:10px;font-size:14px;font-weight:600;
+  font-family:'DM Sans',sans-serif;cursor:pointer;transition:var(--transition);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.upload-btn:hover{background:var(--accent2);transform:translateY(-1px)}
+.upload-btn:disabled{opacity:0.4;cursor:default;transform:none}
+
+.upload-error{
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);
+  color:var(--danger);padding:10px 14px;border-radius:8px;
+  font-size:12px;margin-top:10px;display:none;
+}
+.upload-error.show{display:block}
+
+.sample-note{
+  font-size:11px;color:var(--text-dim);margin-top:14px;text-align:center;
+  font-family:'DM Mono',monospace;
+}
+.sample-note a{color:var(--accent2);cursor:pointer;text-decoration:none}
+.sample-note a:hover{text-decoration:underline}
+
+/* ── APP SHELL (hidden until data loaded) ── */
+#appShell{display:none}
+#appShell.show{display:block}
+
+/* SIDEBAR */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:64px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:20px 0;z-index:100;gap:4px}
+.sidebar-logo{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;margin-bottom:20px;flex-shrink:0;font-family:'Playfair Display',serif}
+.nav-item{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);color:var(--text-dim);position:relative}
+.nav-item:hover,.nav-item.active{background:var(--accent-glow);color:var(--accent2)}
+.nav-item svg{width:18px;height:18px}
+.nav-tooltip{position:absolute;left:52px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:var(--transition);z-index:200}
+.nav-item:hover .nav-tooltip{opacity:1}
+
+/* TOPBAR */
+.topbar{position:fixed;left:64px;right:0;top:0;height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;z-index:90}
+.topbar-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;letter-spacing:-0.02em;flex:1}
+.topbar-title span{color:var(--accent2)}
+.topbar-meta{font-size:12px;color:var(--text-muted);font-family:'DM Mono',monospace}
+.topbar-file{font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reload-btn{background:transparent;border:1px solid var(--border2);color:var(--text-muted);padding:5px 12px;border-radius:8px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:var(--transition);display:flex;align-items:center;gap:5px}
+.reload-btn:hover{border-color:var(--accent);color:var(--accent2)}
+.status-pill{background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.25);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* MAIN */
+.main{margin-left:64px;padding-top:56px;min-height:100vh}
+.content{padding:28px;max-width:1400px}
+
+/* SECTION HEADERS */
+.section-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.section-title{font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';display:inline-block;width:3px;height:12px;background:var(--accent);border-radius:2px}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden;transition:var(--transition)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--accent));opacity:0.8}
+.kpi-card:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:var(--card-shadow)}
+.kpi-label{font-size:11px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px}
+.kpi-value{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--text);line-height:1;margin-bottom:8px;letter-spacing:-0.02em}
+.kpi-sub{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px}
+.kpi-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-danger{background:rgba(239,68,68,0.12);color:var(--danger)}
+.badge-warning{background:rgba(245,158,11,0.12);color:var(--warning)}
+.badge-success{background:rgba(16,185,129,0.12);color:var(--success)}
+
+/* FILTER BAR */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.filter-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap}
+.filter-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.filter-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 28px 6px 12px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:var(--transition);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8ba8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;min-width:140px}
+.filter-select:focus{border-color:var(--accent)}
+.reset-btn{background:transparent;border:1px solid var(--border2);color:var(--text-muted);padding:6px 14px;border-radius:8px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:var(--transition);margin-left:auto;display:flex;align-items:center;gap:6px}
+.reset-btn:hover{border-color:var(--accent);color:var(--accent2)}
+
+/* CHART CARDS */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+.charts-three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:24px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;transition:var(--transition)}
+.chart-card:hover{border-color:var(--border2)}
+.chart-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.chart-title{font-size:14px;font-weight:600;color:var(--text);line-height:1.3}
+.chart-subtitle{font-size:11px;color:var(--text-dim);margin-top:3px}
+.chart-badge{font-size:11px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);padding:3px 9px;border-radius:6px;white-space:nowrap}
+.chart-container{position:relative;height:240px}
+.chart-container.tall{height:300px}
+.chart-container.short{height:200px}
+.chart-container.xtall{height:400px}
+
+/* REVENUE TABLE */
+.revenue-row{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:24px}
+.risk-table{width:100%;border-collapse:collapse;margin-top:6px}
+.risk-table th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);padding:10px 14px;border-bottom:1px solid var(--border)}
+.risk-table td{padding:12px 14px;font-size:13px;color:var(--text-muted);border-bottom:1px solid rgba(30,45,69,0.5);font-family:'DM Mono',monospace}
+.risk-table tr:last-child td{border-bottom:none}
+.risk-table td:first-child{color:var(--text);font-family:'DM Sans',sans-serif;font-weight:500}
+.risk-bar-wrap{display:flex;align-items:center;gap:10px}
+.risk-bar-bg{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.risk-bar-fill{height:100%;border-radius:3px}
+.risk-bar-pct{font-size:11px;color:var(--text-muted);width:36px;text-align:right}
+
+/* INSIGHTS */
+.insights-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:24px}
+.insights-header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.insights-icon{width:32px;height:32px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.25);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--purple)}
+.insights-title{font-size:14px;font-weight:600;color:var(--text)}
+.insights-title span{font-size:11px;font-weight:400;color:var(--text-dim);margin-left:8px}
+.insights-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.insight-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;gap:12px;transition:var(--transition)}
+.insight-item:hover{border-color:var(--border2)}
+.insight-indicator{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch}
+.insight-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px}
+.insight-text{font-size:12px;color:var(--text-muted);line-height:1.55}
+.insight-text strong{color:var(--text);font-weight:600}
+
+/* REMEDY CARDS */
+.remedy-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.remedy-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;transition:var(--transition)}
+.remedy-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--rc-color,var(--accent))}
+.remedy-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.remedy-icon{font-size:22px;margin-bottom:10px}
+.remedy-category{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--rc-color,var(--accent));margin-bottom:6px}
+.remedy-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+.remedy-actions{display:flex;flex-direction:column;gap:5px}
+.remedy-action{font-size:12px;color:var(--text-muted);display:flex;align-items:flex-start;gap:7px;line-height:1.45}
+.remedy-action::before{content:'→';color:var(--rc-color,var(--accent));font-weight:700;flex-shrink:0;margin-top:1px}
+.remedy-action strong{color:var(--text)}
+
+/* LOCATION */
+.location-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:18px}
+.map-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.map-header{padding:18px 22px 14px;border-bottom:1px solid var(--border)}
+.map-wrap{position:relative;height:380px;background:#0d1525}
+.city-table-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
+.city-table{width:100%;border-collapse:collapse}
+.city-table th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+.city-table td{padding:9px 10px;font-size:12px;border-bottom:1px solid rgba(30,45,69,0.4);color:var(--text-muted);font-family:'DM Mono',monospace;vertical-align:middle}
+.city-table td:first-child{color:var(--text);font-family:'DM Sans',sans-serif;font-weight:500;font-size:12px}
+.city-table tr:hover td{background:rgba(255,255,255,0.02)}
+.churn-rate-cell{display:flex;align-items:center;gap:8px}
+.churn-rate-bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;min-width:40px}
+.churn-rate-fill{height:100%;border-radius:2px}
+.rate-val{font-size:11px;width:32px}
+.heatmap-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.location-insights{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.loc-insight{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.loc-insight-icon{font-size:18px;margin-bottom:8px}
+.loc-insight-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px}
+.loc-insight-text{font-size:11px;color:var(--text-muted);line-height:1.55}
+.loc-insight-text strong{color:var(--text)}
+
+/* Q&A */
+.qa-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:24px}
+.qa-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.qa-icon{width:36px;height:36px;background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(139,92,246,0.2));border:1px solid rgba(99,102,241,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.qa-title{font-size:14px;font-weight:600;color:var(--text)}
+.qa-desc{font-size:11px;color:var(--text-dim);margin-top:2px}
+.qa-suggestions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.qa-suggestion{background:var(--surface2);border:1px solid var(--border2);color:var(--text-muted);padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:var(--transition);white-space:nowrap}
+.qa-suggestion:hover{border-color:var(--accent);color:var(--accent2);background:var(--accent-glow)}
+.qa-input-row{display:flex;gap:10px;align-items:center}
+.qa-input{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:11px 16px;border-radius:10px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:var(--transition)}
+.qa-input:focus{border-color:var(--accent)}
+.qa-input::placeholder{color:var(--text-dim)}
+.qa-btn{background:var(--accent);border:none;color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:var(--transition);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.qa-btn:hover{background:var(--accent2);transform:translateY(-1px)}
+.qa-btn:disabled{opacity:0.5;cursor:default;transform:none}
+.qa-response{margin-top:20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px 20px;display:none}
+.qa-response.visible{display:block}
+.qa-response-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent2);margin-bottom:10px}
+.qa-response-text{font-size:13px;color:var(--text-muted);line-height:1.65}
+.qa-response-text strong{color:var(--text);font-weight:600}
+.qa-metrics{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+.qa-metric{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center}
+.qa-metric-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--text)}
+.qa-metric-label{font-size:10px;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.05em}
+.qa-chart-container{margin-top:16px;height:220px;display:none}
+.qa-chart-container.visible{display:block}
+
+/* FOOTER */
+.footer{border-top:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;color:var(--text-dim);font-size:11px;font-family:'DM Mono',monospace}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+/* RESPONSIVE */
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.charts-three,.remedy-cards,.location-grid,.heatmap-row{grid-template-columns:1fr 1fr}.insights-grid,.location-insights{grid-template-columns:1fr 1fr}.revenue-row{grid-template-columns:1fr}}
+@media(max-width:780px){.kpi-grid{grid-template-columns:1fr 1fr}.charts-grid,.charts-three,.remedy-cards,.location-grid,.heatmap-row,.insights-grid,.location-insights{grid-template-columns:1fr}.sidebar{display:none}.main{margin-left:0}.topbar{left:0}.content{padding:16px}}
+
+/* FADE */
+.fade-in{opacity:0;transform:translateY(10px);animation:fadeIn 0.35s ease forwards}
+@keyframes fadeIn{to{opacity:1;transform:none}}
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}.d4{animation-delay:.2s}.d5{animation-delay:.25s}
+
+/* NO LOCATION notice */
+.no-location-notice{
+  background:var(--surface2);border:1px dashed var(--border2);
+  border-radius:12px;padding:28px;text-align:center;
+  color:var(--text-dim);font-size:13px;
+  grid-column:1/-1;
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     UPLOAD SCREEN
+══════════════════════════════════════ -->
+<div id="uploadScreen">
+  <div class="upload-wrap">
+    <div class="upload-logo">Churn<span>IQ</span></div>
+    <div class="upload-tagline">telecom customer intelligence platform</div>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json,.tsv,.txt" onchange="handleFileSelect(this.files[0])">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop your data file here</div>
+      <div class="drop-sub">or click to browse from your computer</div>
+      <div class="drop-formats">
+        <span class="format-pill csv">CSV</span>
+        <span class="format-pill xlsx">XLSX</span>
+        <span class="format-pill xlsx">XLS</span>
+        <span class="format-pill json">JSON</span>
+        <span class="format-pill tsv">TSV</span>
+        <span class="format-pill tsv">TXT</span>
+      </div>
+    </div>
+
+    <!-- File info (shown after selection) -->
+    <div class="file-info-bar" id="fileInfoBar" style="display:none">
+      <div class="file-info-icon" id="fileInfoIcon">📄</div>
+      <div>
+        <div class="file-info-name" id="fileInfoName">—</div>
+        <div class="file-info-meta" id="fileInfoMeta">—</div>
+      </div>
+      <div class="file-info-change" onclick="resetFile()">Change file</div>
+    </div>
+
+    <!-- Column Mapping Panel -->
+    <div id="mappingPanel">
+      <div class="mapping-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+        Map Your Columns
+      </div>
+      <div class="mapping-sub">Match your file's column names to the fields ChurnIQ needs. Fields marked <span style="color:var(--danger)">✦</span> are required; others are optional but enable more visuals.</div>
+      <div class="mapping-grid" id="mappingGrid">
+        <!-- JS rendered -->
+      </div>
+    </div>
+
+    <div class="upload-error" id="uploadError"></div>
+
+    <button class="upload-btn" id="uploadBtn" onclick="loadData()" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Launch Dashboard
+    </button>
+
+    <div class="sample-note">
+      Using the Telco dataset?
+      <a onclick="loadSampleMapping()">Auto-detect columns</a> ·
+      Supports any churn dataset with similar structure
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APP SHELL
+══════════════════════════════════════ -->
+<div id="appShell">
+  <nav class="sidebar">
+    <div class="sidebar-logo">C</div>
+    <div class="nav-item active" onclick="s2('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><div class="nav-tooltip">Overview</div></div>
+    <div class="nav-item" onclick="s2('charts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg><div class="nav-tooltip">Analytics</div></div>
+    <div class="nav-item" onclick="s2('reasons-section')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div class="nav-tooltip">Why They Leave</div></div>
+    <div class="nav-item" onclick="s2('location-section')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><div class="nav-tooltip">Location Intel</div></div>
+    <div class="nav-item" onclick="s2('insights')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><div class="nav-tooltip">Insights</div></div>
+    <div class="nav-item" onclick="s2('ai-qa')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><div class="nav-tooltip">AI Q&A</div></div>
+  </nav>
+
+  <header class="topbar">
+    <div class="topbar-title">Churn<span>IQ</span></div>
+    <div class="topbar-file" id="topbarFile">—</div>
+    <div class="topbar-meta" id="dataRecordCount">—</div>
+    <button class="reload-btn" onclick="reloadFile()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      New File
+    </button>
+    <div class="status-pill"><div class="status-dot"></div>Loaded</div>
+  </header>
+
+  <main class="main">
+  <div class="content">
+
+    <div id="overview" style="padding-top:4px">
+      <div class="section-header fade-in"><div class="section-title">Executive Summary</div></div>
+      <div class="kpi-grid">
+        <div class="kpi-card fade-in d1" style="--kpi-color:#3b82f6"><div class="kpi-label">Total Customers</div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub"><span class="kpi-badge badge-success">Active</span></div></div>
+        <div class="kpi-card fade-in d2" style="--kpi-color:#ef4444"><div class="kpi-label">Churned Customers</div><div class="kpi-value" id="kpiChurned">—</div><div class="kpi-sub"><span class="kpi-badge badge-danger" id="kpiChurnBadge">—</span></div></div>
+        <div class="kpi-card fade-in d3" style="--kpi-color:#f59e0b"><div class="kpi-label">Churn Rate</div><div class="kpi-value" id="kpiChurnRate">—</div><div class="kpi-sub"><span class="kpi-badge badge-warning">High Risk</span></div></div>
+        <div class="kpi-card fade-in d4" style="--kpi-color:#8b5cf6"><div class="kpi-label">Revenue at Risk</div><div class="kpi-value" id="kpiRevRisk">—</div><div class="kpi-sub"><span class="kpi-badge badge-danger">Critical</span></div></div>
+        <div class="kpi-card fade-in d5" style="--kpi-color:#10b981"><div class="kpi-label">Avg Churn Score</div><div class="kpi-value" id="kpiAvgScore">—</div><div class="kpi-sub"><span class="kpi-badge badge-warning">Elevated</span></div></div>
+      </div>
+    </div>
+
+    <div class="filter-bar fade-in">
+      <div class="filter-label">Filters</div>
+      <div class="filter-group" id="filterGroup">
+        <select class="filter-select" id="filterContract"><option value="All">Contract: All</option></select>
+        <select class="filter-select" id="filterInternet"><option value="All">Internet: All</option></select>
+        <select class="filter-select" id="filterTenure"><option value="All">Tenure: All</option><option value="0-12">0–12 Months</option><option value="13-24">13–24 Months</option><option value="25-48">25–48 Months</option><option value="48+">48+ Months</option></select>
+        <select class="filter-select" id="filterChurn"><option value="All">Churn: All</option><option value="Yes">Churned</option><option value="No">Retained</option></select>
+        <select class="filter-select" id="filterPayment"><option value="All">Payment: All</option></select>
+      </div>
+      <button class="reset-btn" onclick="resetFilters()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset
+      </button>
+    </div>
+
+    <div id="charts">
+      <div class="section-header fade-in"><div class="section-title">Churn Distribution Analysis</div></div>
+      <div class="charts-grid fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Churn by Contract Type</div><div class="chart-subtitle">Volume per contract segment</div></div><div class="chart-badge" id="badgeContract">—</div></div><div class="chart-container"><canvas id="chartContract"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Churn by Internet Service</div><div class="chart-subtitle">Service type breakdown</div></div><div class="chart-badge" id="badgeInternet">—</div></div><div class="chart-container"><canvas id="chartInternet"></canvas></div></div>
+      </div>
+      <div class="charts-three fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Churn by Tenure</div><div class="chart-subtitle">Early vs long-term</div></div><div class="chart-badge" id="badgeTenure">—</div></div><div class="chart-container short"><canvas id="chartTenure"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Payment Method</div><div class="chart-subtitle">Churn by payment type</div></div><div class="chart-badge" id="badgePayment">—</div></div><div class="chart-container short"><canvas id="chartPayment"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Monthly Charges</div><div class="chart-subtitle">Churned vs retained</div></div></div><div class="chart-container short"><canvas id="chartCharges"></canvas></div></div>
+      </div>
+      <div class="chart-card fade-in" style="margin-bottom:24px">
+        <div class="chart-header"><div><div class="chart-title">Top 10 Churn Reasons</div><div class="chart-subtitle">Primary attrition drivers</div></div><div class="chart-badge">Top Drivers</div></div>
+        <div class="chart-container tall"><canvas id="chartReasons"></canvas></div>
+      </div>
+
+      <div class="section-header fade-in"><div class="section-title">Revenue Risk Assessment</div></div>
+      <div class="revenue-row fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Revenue at Risk by Contract</div><div class="chart-subtitle">Monthly revenue exposure from churn</div></div><div class="chart-badge" id="badgeRevTotal">—</div></div><div class="chart-container"><canvas id="chartRevenue"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Revenue Risk Breakdown</div></div></div><table class="risk-table"><thead><tr><th>Contract</th><th>Revenue at Risk</th><th>Share</th></tr></thead><tbody id="riskTableBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- REASONS & REMEDIES -->
+    <div id="reasons-section" style="margin-bottom:24px">
+      <div class="section-header fade-in"><div class="section-title">Why Customers Leave — Root Cause Analysis</div></div>
+      <div class="charts-grid fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">All Churn Reasons</div><div class="chart-subtitle">Full breakdown of stated reasons</div></div><div class="chart-badge" id="badgeAllReasons">—</div></div><div class="chart-container xtall"><canvas id="chartAllReasons"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Churn by Category</div><div class="chart-subtitle">Competitive vs Service vs Other</div></div></div><div class="chart-container" style="height:180px"><canvas id="chartReasonCategory"></canvas></div><div id="categoryBreakdown" style="margin-top:14px"></div></div>
+      </div>
+      <div class="chart-card fade-in" style="margin-bottom:18px">
+        <div class="chart-header"><div><div class="chart-title">🛡️ Retention Playbook</div><div class="chart-subtitle">Recommended interventions matched to churn drivers</div></div></div>
+        <div class="remedy-cards" id="remedyCards"></div>
+      </div>
+      <div class="charts-grid fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Top Reasons by Contract Type</div><div class="chart-subtitle">Which reasons dominate each segment</div></div></div><div class="chart-container tall"><canvas id="chartReasonByContract"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Top Reasons by Internet Service</div><div class="chart-subtitle">Fiber vs DSL churn driver comparison</div></div></div><div class="chart-container tall"><canvas id="chartReasonByInternet"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- LOCATION -->
+    <div id="location-section" style="margin-bottom:24px">
+      <div class="section-header fade-in"><div class="section-title">Location Intelligence — Geographic Churn Analysis</div></div>
+      <div class="location-grid fade-in">
+        <div class="map-card"><div class="map-header"><div class="chart-title">Geographic Churn Hotspot Map</div><div class="chart-subtitle">Bubble size = churn volume · Color = churn rate intensity</div></div><div class="map-wrap"><canvas id="cityMap"></canvas></div></div>
+        <div class="city-table-card"><div class="chart-header"><div><div class="chart-title">Top 20 Cities by Churn</div></div><div class="chart-badge" id="badgeCities">—</div></div><div style="overflow-y:auto;max-height:340px"><table class="city-table"><thead><tr><th>#</th><th>City</th><th>Churned</th><th>Rate</th><th>Risk</th></tr></thead><tbody id="cityTableBody"></tbody></table></div></div>
+      </div>
+      <div class="heatmap-row fade-in">
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">Top 15 Cities — Churn Volume</div><div class="chart-subtitle">Volume of churned customers per city</div></div></div><div class="chart-container tall"><canvas id="chartCityVolume"></canvas></div></div>
+        <div class="chart-card"><div class="chart-header"><div><div class="chart-title">City Churn Rate Ranking</div><div class="chart-subtitle">Rate % — cities with 10+ customers</div></div></div><div class="chart-container tall"><canvas id="chartCityRate"></canvas></div></div>
+      </div>
+      <div class="location-insights fade-in" id="locationInsights"></div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div id="insights" class="insights-panel fade-in">
+      <div class="insights-header"><div class="insights-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="insights-title">AI-Generated Business Insights <span>— Dynamically computed from filtered data</span></div></div></div>
+      <div class="insights-grid" id="insightsGrid"></div>
+    </div>
+
+    <!-- Q&A -->
+    <div id="ai-qa" class="qa-section fade-in">
+      <div class="qa-header"><div class="qa-icon">🤖</div><div><div class="qa-title">Natural Language Analytics</div><div class="qa-desc">Ask questions about churn reasons, locations, revenue risk, or customer segments</div></div></div>
+      <div class="qa-suggestions">
+        <div class="qa-suggestion" onclick="askQ(this)">Why is churn high in fiber optic?</div>
+        <div class="qa-suggestion" onclick="askQ(this)">Which city has highest churn rate?</div>
+        <div class="qa-suggestion" onclick="askQ(this)">What are the top churn drivers?</div>
+        <div class="qa-suggestion" onclick="askQ(this)">How to reduce competitive churn?</div>
+        <div class="qa-suggestion" onclick="askQ(this)">Compare churn rate between contract types</div>
+        <div class="qa-suggestion" onclick="askQ(this)">What is the revenue at risk breakdown?</div>
+      </div>
+      <div class="qa-input-row">
+        <input class="qa-input" id="qaInput" placeholder="Ask about churn reasons, locations, revenue risk, remedies..." onkeypress="if(event.key==='Enter') submitQuery()">
+        <button class="qa-btn" id="qaBtn" onclick="submitQuery()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Analyze</button>
+      </div>
+      <div class="qa-response" id="qaResponse">
+        <div class="qa-response-label">Analysis Result</div>
+        <div class="qa-response-text" id="qaResponseText"></div>
+        <div class="qa-metrics" id="qaMetrics"></div>
+        <div class="qa-chart-container" id="qaChartWrap"><canvas id="qaChart"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="footer">
+    <span>ChurnIQ Analytics Platform v3.0</span>
+    <span id="footerStats">—</span>
+    <span>Upload-powered · Works offline</span>
+  </div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════
+let rawData=[], filteredData=[], charts={}, qaChart=null;
+let currentFileName='', colMap={};
+let fileColumns=[];
+
+const P={blue:'#3b82f6',red:'#ef4444',amber:'#f59e0b',green:'#10b981',purple:'#8b5cf6',teal:'#14b8a6',orange:'#f97316',pink:'#ec4899',sky:'#0ea5e9',indigo:'#6366f1'};
+const CONTRACT_C=[P.red,P.amber,P.green];
+const INTERNET_C=[P.orange,P.blue,P.teal];
+const TENURE_C=[P.red,P.amber,P.green,P.sky];
+const PAY_C=[P.purple,P.blue,P.teal,P.orange];
+
+Chart.defaults.color='#7a8ba8';
+Chart.defaults.borderColor='#1e2d45';
+Chart.defaults.font.family="'DM Sans', sans-serif";
+Chart.defaults.font.size=11;
+const TTP={backgroundColor:'#1a2235',borderColor:'#263350',borderWidth:1,titleColor:'#e8edf5',bodyColor:'#7a8ba8',titleFont:{size:12,weight:'600'},bodyFont:{size:11},padding:10,cornerRadius:8};
+
+// FIELD DEFINITIONS
+const FIELD_DEFS = [
+  {key:'churnLabel',   label:'Churn Label',        req:true,  hint:'Yes/No or 1/0 churn status',    aliases:['churn label','churn','churned','churn_label','churn value','churnvalue','churn_value','churn status']},
+  {key:'contract',     label:'Contract Type',       req:true,  hint:'Month-to-month, One year, etc',  aliases:['contract','contract type','contract_type','plan','subscription type']},
+  {key:'monthlyCharge',label:'Monthly Charges',     req:true,  hint:'Numeric monthly charge amount',  aliases:['monthly charges','monthlycharges','monthly charge','monthly_charges','monthly fee','revenue','charge']},
+  {key:'internetSvc',  label:'Internet Service',    req:false, hint:'Fiber optic, DSL, No, etc',      aliases:['internet service','internet_service','internet','service type','connection type']},
+  {key:'tenure',       label:'Tenure (Months)',     req:false, hint:'Customer age in months',         aliases:['tenure months','tenure_months','tenure','months','customer age','age months']},
+  {key:'paymentMethod',label:'Payment Method',      req:false, hint:'Electronic check, etc',          aliases:['payment method','payment_method','payment','pay method','billing method']},
+  {key:'churnReason',  label:'Churn Reason',        req:false, hint:'Why the customer left',          aliases:['churn reason','churn_reason','reason','reason for leaving','exit reason','cancellation reason']},
+  {key:'churnScore',   label:'Churn Score',         req:false, hint:'0-100 propensity score',         aliases:['churn score','churn_score','score','propensity score','risk score']},
+  {key:'city',         label:'City',                req:false, hint:'City name for geo analysis',     aliases:['city','town','location','city name']},
+  {key:'latitude',     label:'Latitude',            req:false, hint:'Geographic latitude coordinate', aliases:['latitude','lat','lat long','latitude coordinate']},
+  {key:'longitude',    label:'Longitude',           req:false, hint:'Geographic longitude',           aliases:['longitude','lng','lon','longitude coordinate']},
+];
+
+const REASON_CATS = {
+  'Competitor offered higher download speeds':'Competitive',
+  'Competitor offered more data':'Competitive',
+  'Competitor made better offer':'Competitive',
+  'Competitor had better devices':'Competitive',
+  'Attitude of support person':'Service Quality',
+  'Attitude of service provider':'Service Quality',
+  'Poor expertise of phone support':'Service Quality',
+  'Poor expertise of online support':'Service Quality',
+  'Network reliability':'Network/Technical',
+  'Product dissatisfaction':'Product',
+  'Lack of self-service on Website':'Product',
+  'Limited range of services':'Product',
+  'Lack of affordable download/upload speed':'Product',
+  'Price too high':'Pricing',
+  'Extra data charges':'Pricing',
+  'Long distance charges':'Pricing',
+  'Service dissatisfaction':'Service Quality',
+  'Moved':'Life Events',
+  'Deceased':'Life Events',
+  "Don't know":'Unknown',
+};
+const CAT_COLORS={'Competitive':P.red,'Service Quality':P.orange,'Pricing':P.amber,'Product':P.blue,'Network/Technical':P.purple,'Life Events':P.teal,'Unknown':P.sky};
+
+const REMEDY_PLAYBOOK=[
+  {icon:'⚔️',category:'Competitive Threat',color:P.red,title:'Beat Competitive Offers',actions:['<strong>Price-match guarantee</strong> — alert customers when competitors launch offers','<strong>Loyalty rate locks</strong> — 12-month price protection for at-risk segments','<strong>Speed upgrade incentives</strong> — free tier bumps at 6-month mark','<strong>Win-back campaign</strong> — targeted counter-offers 30 days post-churn attempt']},
+  {icon:'🎧',category:'Service Quality',color:P.orange,title:'Elevate Support Experience',actions:['<strong>CSAT scoring</strong> on every interaction — escalate contacts below 3/5','<strong>Dedicated SME tier</strong> — premium support for high-ARPU customers','<strong>Agent training refresh</strong> — quarterly empathy and resolution coaching','<strong>First-contact resolution</strong> target: 85% — measure and publish internally']},
+  {icon:'💰',category:'Pricing & Charges',color:P.amber,title:'Reduce Price Sensitivity',actions:['<strong>Bill shock alerts</strong> — notify when charges exceed 10% of norm','<strong>Bundle discounts</strong> — 15–20% off multi-service packages','<strong>Transparent billing</strong> — plain-language charge explanations in app','<strong>Flat-rate plans</strong> — no-surprise pricing for price-sensitive segments']},
+  {icon:'📡',category:'Network & Product',color:P.blue,title:'Improve Network & Product',actions:['<strong>Proactive outage comms</strong> — notify before customers call','<strong>Self-service portal upgrade</strong> — reduce friction for common tasks','<strong>Speed guarantee SLA</strong> — auto-credit if speeds fall below threshold','<strong>Product roadmap sharing</strong> — communicate upcoming features']},
+  {icon:'🤝',category:'Early Lifecycle',color:P.green,title:'Win the First 12 Months',actions:['<strong>30-60-90 day check-in calls</strong> — proactive CSM outreach','<strong>Onboarding value milestones</strong> — guide key feature adoption','<strong>Early loyalty rewards</strong> — bonus at 6-month mark','<strong>Churn score monitoring</strong> — flag scores above 70 for intervention']},
+  {icon:'🔄',category:'Contract Migration',color:P.purple,title:'Move to Long-Term Contracts',actions:['<strong>M2M → Annual incentive</strong> — 2 months free for switching to annual','<strong>Auto-renewal nudge</strong> — in-app prompt 60 days before expiry','<strong>Quarterly account reviews</strong> — for 24+ month customers','<strong>Referral + loyalty stacking</strong> — compound rewards for tenure']},
+];
+
+// ═══════════════════════════════════════════════════
+// FILE UPLOAD & PARSING
+// ═══════════════════════════════════════════════════
+function s2(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth'})}
+
+// Drag and drop
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(f) handleFileSelect(f);
+});
+
+function handleFileSelect(file){
+  if(!file) return;
+  currentFileName=file.name;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const icons={csv:'📊',xlsx:'📗',xls:'📗',json:'📋',tsv:'📄',txt:'📄'};
+  document.getElementById('fileInfoIcon').textContent=icons[ext]||'📄';
+  document.getElementById('fileInfoName').textContent=file.name;
+  document.getElementById('fileInfoMeta').textContent=`${(file.size/1024).toFixed(1)} KB · ${ext.toUpperCase()} format`;
+  document.getElementById('fileInfoBar').style.display='flex';
+  document.getElementById('dropZone').style.display='none';
+  showError('');
+
+  if(ext==='csv'||ext==='tsv'||ext==='txt'){
+    Papa.parse(file,{
+      header:true,skipEmptyLines:true,
+      preview:3,
+      complete(res){
+        fileColumns=res.meta.fields||[];
+        showMappingPanel(fileColumns);
+        // Now parse full file
+        Papa.parse(file,{
+          header:true,dynamicTyping:true,skipEmptyLines:true,
+          complete(full){
+            window._parsedData=full.data;
+            document.getElementById('uploadBtn').disabled=false;
+          }
+        });
+      },
+      error(e){showError('Could not parse CSV: '+e.message)}
+    });
+  } else if(ext==='xlsx'||ext==='xls'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const json=XLSX.utils.sheet_to_json(ws,{defval:''});
+        if(!json.length){showError('Excel file appears empty.');return;}
+        window._parsedData=json;
+        fileColumns=Object.keys(json[0]);
+        showMappingPanel(fileColumns);
+        document.getElementById('uploadBtn').disabled=false;
+      }catch(err){showError('Could not parse Excel: '+err.message)}
+    };
+    reader.readAsArrayBuffer(file);
+  } else if(ext==='json'){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        let json=JSON.parse(e.target.result);
+        if(!Array.isArray(json)) json=Object.values(json).find(v=>Array.isArray(v))||[];
+        if(!json.length){showError('JSON has no array data.');return;}
+        window._parsedData=json;
+        fileColumns=Object.keys(json[0]);
+        showMappingPanel(fileColumns);
+        document.getElementById('uploadBtn').disabled=false;
+      }catch(err){showError('Could not parse JSON: '+err.message)}
+    };
+    reader.readAsText(file);
+  } else {
+    showError('Unsupported file type. Please use CSV, XLSX, XLS, JSON, or TSV.');
+  }
+}
+
+function showMappingPanel(cols){
+  const grid=document.getElementById('mappingGrid');
+  grid.innerHTML=FIELD_DEFS.map(f=>`
+    <div class="mapping-row">
+      <div class="mapping-label">
+        ${f.label}
+        ${f.req?'<span class="req">✦ Required</span>':'<span class="opt">Optional</span>'}
+      </div>
+      <select class="mapping-select" id="map_${f.key}" title="${f.hint}">
+        <option value="">— Not mapped —</option>
+        ${cols.map(c=>`<option value="${c}">${c}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+
+  // Auto-detect
+  FIELD_DEFS.forEach(f=>{
+    const sel=document.getElementById('map_'+f.key);
+    const match=cols.find(c=>f.aliases.some(a=>c.toLowerCase().trim()===a||c.toLowerCase().trim().includes(a)));
+    if(match){sel.value=match;sel.classList.add('auto-matched');}
+    sel.addEventListener('change',()=>sel.classList.remove('auto-matched'));
+  });
+
+  document.getElementById('mappingPanel').classList.add('show');
+}
+
+function loadSampleMapping(){
+  // Nudge user to upload a file
+  document.getElementById('fileInput').click();
+}
+
+function resetFile(){
+  document.getElementById('fileInfoBar').style.display='none';
+  document.getElementById('dropZone').style.display='block';
+  document.getElementById('mappingPanel').classList.remove('show');
+  document.getElementById('uploadBtn').disabled=true;
+  document.getElementById('fileInput').value='';
+  window._parsedData=null;
+  showError('');
+}
+
+function reloadFile(){
+  document.getElementById('appShell').classList.remove('show');
+  document.getElementById('uploadScreen').classList.remove('hidden');
+  resetFile();
+}
+
+function showError(msg){
+  const el=document.getElementById('uploadError');
+  el.textContent=msg;
+  el.classList.toggle('show',!!msg);
+}
+
+function loadData(){
+  const parsed=window._parsedData;
+  if(!parsed||!parsed.length){showError('No data loaded yet.');return;}
+
+  // Read column mapping
+  colMap={};
+  let missing=[];
+  FIELD_DEFS.forEach(f=>{
+    const v=document.getElementById('map_'+f.key)?.value;
+    if(v) colMap[f.key]=v;
+    else if(f.req) missing.push(f.label);
+  });
+  if(missing.length){showError('Required fields not mapped: '+missing.join(', '));return;}
+
+  // Normalize data
+  rawData=parsed.map(row=>{
+    const n={};
+    Object.entries(colMap).forEach(([key,col])=>{
+      n[key]=row[col];
+    });
+    // Normalize churn label to Yes/No
+    const cl=String(n.churnLabel||'').trim().toLowerCase();
+    n.churnLabel=(cl==='yes'||cl==='1'||cl==='true'||cl==='churned')?'Yes':'No';
+    // Numeric tenure & monthly
+    n.tenure=+n.tenure||0;
+    n.monthlyCharge=+n.monthlyCharge||0;
+    n.churnScore=+n.churnScore||0;
+    return n;
+  });
+
+  filteredData=[...rawData];
+  populateFilters();
+  renderRemedyCards();
+  updateAll();
+
+  document.getElementById('topbarFile').textContent=currentFileName;
+  document.getElementById('uploadScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════════
+// POPULATE FILTER DROPDOWNS FROM DATA
+// ═══════════════════════════════════════════════════
+function populateFilters(){
+  function fill(selId,field,prefix){
+    const sel=document.getElementById(selId);
+    const vals=[...new Set(rawData.map(r=>r[field]).filter(Boolean))].sort();
+    sel.innerHTML=`<option value="All">${prefix}: All</option>`+vals.map(v=>`<option value="${v}">${v}</option>`).join('');
+  }
+  if(colMap.contract)   fill('filterContract','contract','Contract');
+  if(colMap.internetSvc)fill('filterInternet','internetSvc','Internet');
+  if(colMap.paymentMethod)fill('filterPayment','paymentMethod','Payment');
+
+  ['filterContract','filterInternet','filterTenure','filterChurn','filterPayment']
+    .forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
+}
+
+// ═══════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════
+function applyFilters(){
+  const fc=gv('filterContract'),fi=gv('filterInternet'),ft=gv('filterTenure'),fch=gv('filterChurn'),fp=gv('filterPayment');
+  filteredData=rawData.filter(r=>{
+    if(fc!=='All'&&r.contract!==fc) return false;
+    if(fi!=='All'&&r.internetSvc!==fi) return false;
+    if(fch!=='All'&&r.churnLabel!==fch) return false;
+    if(fp!=='All'&&r.paymentMethod!==fp) return false;
+    if(ft!=='All'){
+      const t=+r.tenure;
+      if(ft==='0-12'&&!(t>=0&&t<=12)) return false;
+      if(ft==='13-24'&&!(t>=13&&t<=24)) return false;
+      if(ft==='25-48'&&!(t>=25&&t<=48)) return false;
+      if(ft==='48+'&&!(t>48)) return false;
+    }
+    return true;
+  });
+  updateAll();
+}
+function gv(id){return document.getElementById(id).value}
+function resetFilters(){
+  ['filterContract','filterInternet','filterTenure','filterChurn','filterPayment'].forEach(id=>document.getElementById(id).value='All');
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════════
+// UPDATE ALL
+// ═══════════════════════════════════════════════════
+function updateAll(){
+  const k=computeKPIs(filteredData);
+  updateKPIs(k);
+  updateMainCharts(filteredData);
+  updateRiskTable(filteredData);
+  updateReasonCharts(filteredData);
+  updateLocationSection(filteredData);
+  updateInsights(filteredData,k);
+  document.getElementById('dataRecordCount').textContent=`${filteredData.length.toLocaleString()} / ${rawData.length.toLocaleString()} records`;
+  document.getElementById('footerStats').textContent=`${k.total.toLocaleString()} customers · ${k.churned.toLocaleString()} churned · ₹${(k.revRisk/1000).toFixed(1)}K at risk`;
+}
+
+// ═══════════════════════════════════════════════════
+// KPIs
+// ═══════════════════════════════════════════════════
+function computeKPIs(data){
+  const total=data.length;
+  const churned=data.filter(r=>r.churnLabel==='Yes').length;
+  const churnRate=total>0?(churned/total*100):0;
+  const revRisk=data.filter(r=>r.churnLabel==='Yes').reduce((s,r)=>s+(r.monthlyCharge||0),0);
+  const scored=data.filter(r=>r.churnScore>0);
+  const avgScore=scored.length>0?scored.reduce((s,r)=>s+r.churnScore,0)/scored.length:0;
+  return{total,churned,churnRate,revRisk,avgScore};
+}
+function updateKPIs(k){
+  anim('kpiTotal',0,k.total,1000,v=>Math.round(v).toLocaleString());
+  anim('kpiChurned',0,k.churned,1000,v=>Math.round(v).toLocaleString());
+  anim('kpiChurnRate',0,k.churnRate,1000,v=>v.toFixed(2)+'%');
+  anim('kpiRevRisk',0,k.revRisk,1000,v=>'₹'+(v/1000).toFixed(1)+'K');
+  anim('kpiAvgScore',0,k.avgScore,1000,v=>v.toFixed(1));
+  document.getElementById('kpiChurnBadge').textContent=k.churnRate.toFixed(1)+'%';
+}
+function anim(id,s,e,dur,fmt){
+  const el=document.getElementById(id);if(!el)return;
+  const t0=performance.now();
+  (function tick(now){const p=Math.min((now-t0)/dur,1),ease=1-Math.pow(1-p,3);el.textContent=fmt(s+(e-s)*ease);if(p<1)requestAnimationFrame(tick);})(t0);
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function churnBy(data,field){const o={};data.filter(r=>r.churnLabel==='Yes').forEach(r=>{const k=r[field]||'Unknown';o[k]=(o[k]||0)+1;});return o;}
+function allBy(data,field){const o={};data.forEach(r=>{const k=r[field]||'Unknown';o[k]=(o[k]||0)+1;});return o;}
+function tenG(m){return m<=12?'0–12 Mo':m<=24?'13–24 Mo':m<=48?'25–48 Mo':'48+ Mo'}
+function mkChart(id,cfg){const ctx=document.getElementById(id);if(!ctx)return;if(charts[id])charts[id].destroy();charts[id]=new Chart(ctx,cfg);}
+function barOpts(hor=false){return{indexAxis:hor?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:TTP},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}};}
+
+// ═══════════════════════════════════════════════════
+// MAIN CHARTS
+// ═══════════════════════════════════════════════════
+function updateMainCharts(data){
+  // Contract
+  if(colMap.contract){
+    const gc=churnBy(data,'contract');
+    const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+    const cv=co.map(k=>gc[k]||0);
+    document.getElementById('badgeContract').textContent='Total: '+cv.reduce((a,b)=>a+b,0);
+    const cc=co.map((_,i)=>CONTRACT_C[i%CONTRACT_C.length]);
+    mkChart('chartContract',{type:'bar',data:{labels:co,datasets:[{data:cv,backgroundColor:cc.map(c=>c+'99'),borderColor:cc,borderWidth:2,borderRadius:6}]},options:barOpts(true)});
+  }
+  // Internet
+  if(colMap.internetSvc){
+    const gi=churnBy(data,'internetSvc');
+    const io=[...new Set(data.map(r=>r.internetSvc).filter(Boolean))].sort();
+    const iv=io.map(k=>gi[k]||0);
+    document.getElementById('badgeInternet').textContent='Total: '+iv.reduce((a,b)=>a+b,0);
+    const ic=io.map((_,i)=>INTERNET_C[i%INTERNET_C.length]);
+    mkChart('chartInternet',{type:'bar',data:{labels:io,datasets:[{data:iv,backgroundColor:ic.map(c=>c+'99'),borderColor:ic,borderWidth:2,borderRadius:6}]},options:barOpts(false)});
+  }
+  // Tenure
+  if(colMap.tenure){
+    const to=['0–12 Mo','13–24 Mo','25–48 Mo','48+ Mo'],tg={};
+    data.filter(r=>r.churnLabel==='Yes').forEach(r=>{const g=tenG(r.tenure);tg[g]=(tg[g]||0)+1;});
+    const tv=to.map(k=>tg[k]||0);
+    document.getElementById('badgeTenure').textContent='Total: '+tv.reduce((a,b)=>a+b,0);
+    mkChart('chartTenure',{type:'bar',data:{labels:to,datasets:[{data:tv,backgroundColor:TENURE_C.map(c=>c+'99'),borderColor:TENURE_C,borderWidth:2,borderRadius:6}]},options:barOpts(false)});
+  }
+  // Payment
+  if(colMap.paymentMethod){
+    const gp=churnBy(data,'paymentMethod');
+    const pk=Object.keys(gp).sort((a,b)=>gp[b]-gp[a]);
+    const pv=pk.map(k=>gp[k]);
+    document.getElementById('badgePayment').textContent='Types: '+pk.length;
+    mkChart('chartPayment',{type:'doughnut',data:{labels:pk.map(k=>k.replace(' (automatic)','')),datasets:[{data:pv,backgroundColor:PAY_C.map(c=>c+'cc'),borderColor:PAY_C,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP}}});
+  }
+  // Charges distribution
+  if(colMap.monthlyCharge){
+    const churned=data.filter(r=>r.churnLabel==='Yes').map(r=>r.monthlyCharge);
+    const retained=data.filter(r=>r.churnLabel==='No').map(r=>r.monthlyCharge);
+    const max=Math.max(...data.map(r=>r.monthlyCharge));
+    const step=Math.ceil(max/6);
+    const bins=Array.from({length:7},(_,i)=>i*step);
+    const bl=bins.slice(0,-1).map((b,i)=>`${b}–${bins[i+1]}`);
+    const hist=arr=>{const c=new Array(bins.length-1).fill(0);arr.forEach(v=>{for(let i=0;i<bins.length-1;i++)if(v>=bins[i]&&v<bins[i+1]){c[i]++;break;}});return c;};
+    mkChart('chartCharges',{type:'line',data:{labels:bl,datasets:[{label:'Churned',data:hist(churned),borderColor:P.red,backgroundColor:P.red+'22',fill:true,tension:0.4,borderWidth:2,pointRadius:3},{label:'Retained',data:hist(retained),borderColor:P.green,backgroundColor:P.green+'22',fill:true,tension:0.4,borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}}});
+  }
+  // Top reasons
+  if(colMap.churnReason){
+    const reasons={};
+    data.filter(r=>r.churnLabel==='Yes'&&r.churnReason).forEach(r=>{reasons[r.churnReason]=(reasons[r.churnReason]||0)+1;});
+    const rs=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const rc=rs.map(([k])=>CAT_COLORS[REASON_CATS[k]]||P.blue);
+    mkChart('chartReasons',{type:'bar',data:{labels:rs.map(([k])=>k),datasets:[{data:rs.map(([,v])=>v),backgroundColor:rc.map(c=>c+'99'),borderColor:rc,borderWidth:2,borderRadius:6}]},options:barOpts(true)});
+  }
+  // Revenue
+  if(colMap.contract&&colMap.monthlyCharge){
+    const rv={};
+    data.filter(r=>r.churnLabel==='Yes').forEach(r=>{rv[r.contract]=(rv[r.contract]||0)+r.monthlyCharge;});
+    const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+    const rvv=co.map(k=>+(rv[k]||0).toFixed(0));
+    const tot=rvv.reduce((a,b)=>a+b,0);
+    document.getElementById('badgeRevTotal').textContent='₹'+(tot/1000).toFixed(1)+'K';
+    const cc=co.map((_,i)=>CONTRACT_C[i%CONTRACT_C.length]);
+    mkChart('chartRevenue',{type:'bar',data:{labels:co,datasets:[{data:rvv,backgroundColor:cc.map(c=>c+'99'),borderColor:cc,borderWidth:2,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...TTP,callbacks:{label:ctx=>'₹'+ctx.parsed.y.toLocaleString()}}},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'},ticks:{callback:v=>'₹'+(v/1000).toFixed(0)+'K'}}}}});
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// RISK TABLE
+// ═══════════════════════════════════════════════════
+function updateRiskTable(data){
+  if(!colMap.contract||!colMap.monthlyCharge){document.getElementById('riskTableBody').innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px">Contract and charge fields required</td></tr>';return;}
+  const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+  const rv={};data.filter(r=>r.churnLabel==='Yes').forEach(r=>{rv[r.contract]=(rv[r.contract]||0)+r.monthlyCharge;});
+  const tot=co.reduce((s,c)=>s+(rv[c]||0),0);
+  document.getElementById('riskTableBody').innerHTML=co.map((c,i)=>{
+    const r=rv[c]||0,p=tot>0?(r/tot*100):0;
+    return`<tr><td>${c}</td><td>₹${r.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}</td><td><div class="risk-bar-wrap"><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:${p}%;background:${CONTRACT_C[i%CONTRACT_C.length]}"></div></div><span class="risk-bar-pct">${p.toFixed(0)}%</span></div></td></tr>`;
+  }).join('')+`<tr><td><strong>Total</strong></td><td>₹${tot.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}</td><td>100%</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════
+// REASON CHARTS
+// ═══════════════════════════════════════════════════
+function updateReasonCharts(data){
+  if(!colMap.churnReason){return;}
+  const cd=data.filter(r=>r.churnLabel==='Yes'&&r.churnReason);
+  const allR={};cd.forEach(r=>{allR[r.churnReason]=(allR[r.churnReason]||0)+1;});
+  const sorted=Object.entries(allR).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('badgeAllReasons').textContent='Total: '+cd.length;
+
+  const allC=sorted.map(([k])=>CAT_COLORS[REASON_CATS[k]]||P.blue);
+  mkChart('chartAllReasons',{type:'bar',data:{labels:sorted.map(([k])=>k),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:allC.map(c=>c+'99'),borderColor:allC,borderWidth:2,borderRadius:4}]},options:{...barOpts(true),scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'},ticks:{font:{size:10}}}}}});
+
+  const cats={};cd.forEach(r=>{const c=REASON_CATS[r.churnReason]||'Unknown';cats[c]=(cats[c]||0)+1;});
+  const cS=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  mkChart('chartReasonCategory',{type:'doughnut',data:{labels:cS.map(([k])=>k),datasets:[{data:cS.map(([,v])=>v),backgroundColor:cS.map(([k])=>(CAT_COLORS[k]||P.sky)+'cc'),borderColor:cS.map(([k])=>CAT_COLORS[k]||P.sky),borderWidth:2,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP}}});
+
+  const totCat=cS.reduce((s,[,v])=>s+v,0);
+  document.getElementById('categoryBreakdown').innerHTML=cS.map(([k,v])=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:${CAT_COLORS[k]||P.sky};font-weight:600">${k}</span><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-muted)">${v} <span style="color:var(--text-dim)">(${(v/totCat*100).toFixed(0)}%)</span></span></div>`).join('');
+
+  const top5=sorted.slice(0,5).map(([k])=>k);
+  if(colMap.contract){
+    const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+    mkChart('chartReasonByContract',{type:'bar',data:{labels:top5,datasets:co.map((c,i)=>{const sub=data.filter(r=>r.churnLabel==='Yes'&&r.contract===c);return{label:c,data:top5.map(reason=>sub.filter(r=>r.churnReason===reason).length),backgroundColor:CONTRACT_C[i%CONTRACT_C.length]+'88',borderColor:CONTRACT_C[i%CONTRACT_C.length],borderWidth:1.5,borderRadius:3};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}}});
+  }
+  if(colMap.internetSvc){
+    const iS=[...new Set(data.map(r=>r.internetSvc).filter(Boolean))].sort().slice(0,3);
+    mkChart('chartReasonByInternet',{type:'bar',data:{labels:top5,datasets:iS.map((s,i)=>{const sub=data.filter(r=>r.churnLabel==='Yes'&&r.internetSvc===s);return{label:s,data:top5.map(reason=>sub.filter(r=>r.churnReason===reason).length),backgroundColor:INTERNET_C[i%INTERNET_C.length]+'88',borderColor:INTERNET_C[i%INTERNET_C.length],borderWidth:1.5,borderRadius:3};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}}});
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// REMEDY CARDS
+// ═══════════════════════════════════════════════════
+function renderRemedyCards(){
+  document.getElementById('remedyCards').innerHTML=REMEDY_PLAYBOOK.map(r=>`<div class="remedy-card" style="--rc-color:${r.color}"><div class="remedy-icon">${r.icon}</div><div class="remedy-category">${r.category}</div><div class="remedy-title">${r.title}</div><div class="remedy-actions">${r.actions.map(a=>`<div class="remedy-action">${a}</div>`).join('')}</div></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// LOCATION
+// ═══════════════════════════════════════════════════
+function updateLocationSection(data){
+  const hasGeo=colMap.city||colMap.latitude;
+  if(!hasGeo){
+    document.getElementById('cityTableBody').innerHTML='<tr><td colspan="5" class="no-location-notice" style="text-align:center;padding:20px;color:var(--text-dim)">City / Latitude / Longitude columns not mapped — geographic analysis unavailable</td></tr>';
+    document.getElementById('locationInsights').innerHTML='<div class="no-location-notice">Location columns (City, Latitude, Longitude) were not found in your dataset. Map them to enable geographic analysis.</div>';
+    return;
+  }
+
+  const cs={};
+  data.forEach(r=>{
+    const city=r.city||'Unknown';
+    if(!cs[city])cs[city]={total:0,churned:0,lat:+r.latitude||0,lng:+r.longitude||0};
+    cs[city].total++;
+    if(r.churnLabel==='Yes')cs[city].churned++;
+  });
+
+  const cities=Object.entries(cs).map(([name,v])=>({name,...v,rate:v.total>0?(v.churned/v.total*100):0})).filter(c=>c.total>=2&&c.name!=='Unknown').sort((a,b)=>b.churned-a.churned);
+  const top20=cities.slice(0,20);
+  document.getElementById('badgeCities').textContent=cities.length+' cities';
+
+  const maxRate=Math.max(...cities.filter(c=>c.total>=5).map(c=>c.rate));
+  document.getElementById('cityTableBody').innerHTML=top20.map((c,i)=>{
+    const rc=c.rate>40?P.red:c.rate>30?P.orange:c.rate>25?P.amber:P.green;
+    return`<tr><td style="color:var(--text-dim)">${i+1}</td><td>${c.name}</td><td>${c.churned}</td><td><div class="churn-rate-cell"><div class="churn-rate-bar"><div class="churn-rate-fill" style="width:${Math.min(c.rate/maxRate*100,100)}%;background:${rc}"></div></div><span class="rate-val" style="color:${rc}">${c.rate.toFixed(1)}%</span></div></td><td><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${rc}18;color:${rc};font-weight:600">${c.rate>35?'High':c.rate>25?'Med':'Low'}</span></td></tr>`;
+  }).join('');
+
+  const top15=top20.slice(0,15);
+  const vc=top15.map(c=>c.rate>40?P.red:c.rate>30?P.orange:c.rate>25?P.amber:P.green);
+  mkChart('chartCityVolume',{type:'bar',data:{labels:top15.map(c=>c.name),datasets:[{data:top15.map(c=>c.churned),backgroundColor:vc.map(c=>c+'99'),borderColor:vc,borderWidth:2,borderRadius:4}]},options:{...barOpts(true),plugins:{legend:{display:false},tooltip:{...TTP,callbacks:{label:ctx=>`${ctx.parsed.x} churned (${top15[ctx.dataIndex].rate.toFixed(1)}% rate)`}}}}});
+
+  const rC=cities.filter(c=>c.total>=5).sort((a,b)=>b.rate-a.rate).slice(0,15);
+  const rCols=rC.map(c=>c.rate>40?P.red:c.rate>30?P.orange:c.rate>25?P.amber:P.green);
+  mkChart('chartCityRate',{type:'bar',data:{labels:rC.map(c=>c.name),datasets:[{data:rC.map(c=>+c.rate.toFixed(1)),backgroundColor:rCols.map(c=>c+'99'),borderColor:rCols,borderWidth:2,borderRadius:4}]},options:{...barOpts(true),plugins:{legend:{display:false},tooltip:{...TTP,callbacks:{label:ctx=>`${ctx.parsed.x}% churn rate`}}},scales:{x:{grid:{color:'rgba(30,45,69,0.5)'},ticks:{callback:v=>v+'%'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}}});
+
+  if(colMap.latitude&&colMap.longitude) drawBubbleMap(cities.slice(0,30));
+
+  const tot=data.filter(r=>r.churnLabel==='Yes').length;
+  const t5Pct=tot>0?(cities.slice(0,5).reduce((s,c)=>s+c.churned,0)/tot*100).toFixed(0):0;
+  const hi=cities.filter(c=>c.total>=5&&c.rate>35);
+  const topR=rC[0];
+  document.getElementById('locationInsights').innerHTML=[
+    {icon:'📍',title:'Geographic Concentration',text:`<strong>${cities.slice(0,5).map(c=>c.name).join(', ')}</strong> account for <strong>${t5Pct}%</strong> of all churned customers — churn is concentrated in the largest population centers.`},
+    {icon:'🔥',title:'Highest Risk Cities',text:`<strong>${hi.length} cities</strong> have a churn rate above 35%. <strong>${topR?.name||'N/A'}</strong> leads with <strong>${topR?.rate.toFixed(1)||0}%</strong> — requires urgent local retention programs.`},
+    {icon:'📊',title:'Churn Spread',text:`Churn spans <strong>${cities.length} cities</strong>, suggesting a systemic issue rather than location-specific. Focus on behavioral and contractual drivers rather than geo-targeted fixes alone.`},
+  ].map(i=>`<div class="loc-insight"><div class="loc-insight-icon">${i.icon}</div><div class="loc-insight-title">${i.title}</div><div class="loc-insight-text">${i.text}</div></div>`).join('');
+}
+
+function drawBubbleMap(cities){
+  const canvas=document.getElementById('cityMap');if(!canvas)return;
+  const ctx2=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth||600;canvas.height=canvas.offsetHeight||380;
+  const W=canvas.width,H=canvas.height;
+
+  const lats=cities.map(c=>c.lat).filter(v=>v),lngs=cities.map(c=>c.lng).filter(v=>v);
+  if(!lats.length)return;
+  const LAT_MIN=Math.min(...lats)-0.5,LAT_MAX=Math.max(...lats)+0.5;
+  const LNG_MIN=Math.min(...lngs)-0.5,LNG_MAX=Math.max(...lngs)+0.5;
+  const pad=40;
+  function proj(lat,lng){
+    return{x:pad+(lng-LNG_MIN)/(LNG_MAX-LNG_MIN)*(W-pad*2),y:pad+(LAT_MAX-lat)/(LAT_MAX-LAT_MIN)*(H-pad*2)};
+  }
+
+  ctx2.fillStyle='#0d1525';ctx2.fillRect(0,0,W,H);
+  ctx2.strokeStyle='rgba(30,45,69,0.5)';ctx2.lineWidth=1;
+  for(let i=0;i<5;i++){
+    const y=pad+i*(H-pad*2)/4;ctx2.beginPath();ctx2.moveTo(0,y);ctx2.lineTo(W,y);ctx2.stroke();
+    const x=pad+i*(W-pad*2)/4;ctx2.beginPath();ctx2.moveTo(x,0);ctx2.lineTo(x,H);ctx2.stroke();
+  }
+
+  const maxC=Math.max(...cities.map(c=>c.churned),1);
+  cities.forEach(c=>{
+    if(!c.lat||!c.lng)return;
+    const{x,y}=proj(c.lat,c.lng);
+    const r=5+Math.sqrt(c.churned/maxC)*22;
+    const color=c.rate>40?P.red:c.rate>30?P.orange:c.rate>25?P.amber:P.blue;
+    const grad=ctx2.createRadialGradient(x,y,0,x,y,r*1.8);
+    grad.addColorStop(0,color+'40');grad.addColorStop(1,color+'00');
+    ctx2.beginPath();ctx2.arc(x,y,r*1.8,0,Math.PI*2);ctx2.fillStyle=grad;ctx2.fill();
+    ctx2.beginPath();ctx2.arc(x,y,r,0,Math.PI*2);
+    ctx2.fillStyle=color+'55';ctx2.strokeStyle=color;ctx2.lineWidth=1.5;ctx2.fill();ctx2.stroke();
+    if(r>10){
+      ctx2.fillStyle='#e8edf5';ctx2.font=`${Math.min(10,r*0.7)}px 'DM Sans',sans-serif`;ctx2.textAlign='center';
+      ctx2.fillText(c.name.split(' ')[0],x,y+r+12);
+    }
+  });
+
+  const items=[{c:P.red,l:'>40%'},{c:P.orange,l:'30-40%'},{c:P.amber,l:'25-30%'},{c:P.blue,l:'<25%'}];
+  let lx=10;
+  items.forEach(({c,l})=>{
+    ctx2.beginPath();ctx2.arc(lx+5,H-14,5,0,Math.PI*2);ctx2.fillStyle=c+'88';ctx2.strokeStyle=c;ctx2.lineWidth=1;ctx2.fill();ctx2.stroke();
+    ctx2.fillStyle='#7a8ba8';ctx2.font="10px 'DM Sans'";ctx2.textAlign='left';ctx2.fillText(l,lx+14,H-10);lx+=72;
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// INSIGHTS
+// ═══════════════════════════════════════════════════
+function updateInsights(data,kpis){
+  const cd=data.filter(r=>r.churnLabel==='Yes');
+  const gc=churnBy(data,'contract');
+  const m2m=gc['Month-to-month']||0,m2mPct=cd.length>0?(m2m/cd.length*100).toFixed(0):0;
+  const gi=churnBy(data,'internetSvc');
+  const fT=data.filter(r=>r.internetSvc==='Fiber optic').length;
+  const fR=fT>0?((gi['Fiber optic']||0)/fT*100).toFixed(1):0;
+  const tg={};
+  data.filter(r=>r.churnLabel==='Yes').forEach(r=>{if(colMap.tenure){const g=tenG(r.tenure);tg[g]=(tg[g]||0)+1;}});
+  const earlyPct=cd.length>0&&colMap.tenure?((tg['0–12 Mo']||0)/cd.length*100).toFixed(0):'N/A';
+  const reasons={};cd.forEach(r=>{if(r.churnReason)reasons[r.churnReason]=(reasons[r.churnReason]||0)+1;});
+  const topR=Object.entries(reasons).sort((a,b)=>b[1]-a[1])[0];
+  const rv={};cd.forEach(r=>{rv[r.contract]=(rv[r.contract]||0)+r.monthlyCharge;});
+  const totRev=Object.values(rv).reduce((a,b)=>a+b,0);
+  const m2mRevPct=totRev>0?((rv['Month-to-month']||0)/totRev*100).toFixed(0):0;
+
+  const items=[
+    {color:P.red,level:'Critical Risk',lc:'#ef4444',text:`<strong>${m2mPct}%</strong> of churn and <strong>${m2mRevPct}%</strong> of revenue at risk from month-to-month customers. Contract migration is the #1 retention lever.`},
+    {color:P.orange,level:'Fiber Optic Alert',lc:'#f97316',text:fT>0?`Fiber optic customers churn at <strong>${fR}%</strong>. Competitor speed offers and high pricing are the primary pressure points.`:'Internet service data not available.'},
+    {color:P.amber,level:'Early Lifecycle',lc:'#f59e0b',text:colMap.tenure?`<strong>${earlyPct}%</strong> of all churn occurs in the first 12 months. Structured onboarding can reduce this by 15–25%.`:'Tenure data not mapped.'},
+    {color:P.blue,level:'Top Driver',lc:'#3b82f6',text:topR?`#1 churn reason: <strong>"${topR[0]}"</strong> (${topR[1]} customers). Competitive offers dominate — pricing and feature parity is the strategic battleground.`:'Churn reason data not available.'},
+    {color:P.purple,level:'Revenue Exposure',lc:'#8b5cf6',text:`Monthly revenue at risk: <strong>₹${(kpis.revRisk/1000).toFixed(1)}K</strong>. Annualized: ₹${(kpis.revRisk*12/1000).toFixed(1)}K. Any retention investment under this threshold delivers positive ROI.`},
+    {color:P.green,level:'Opportunity',lc:'#10b981',text:`A <strong>5% churn reduction</strong> saves ~${Math.round(kpis.total*0.05).toLocaleString()} customers and ₹${(kpis.revRisk*0.05/1000).toFixed(1)}K/month in revenue.`},
+  ];
+  document.getElementById('insightsGrid').innerHTML=items.map(i=>`<div class="insight-item"><div class="insight-indicator" style="background:${i.color}"></div><div><div class="insight-label" style="color:${i.lc}">${i.level}</div><div class="insight-text">${i.text}</div></div></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// AI Q&A
+// ═══════════════════════════════════════════════════
+function askQ(el){document.getElementById('qaInput').value=el.textContent;submitQuery();}
+function submitQuery(){
+  const q=document.getElementById('qaInput').value.trim().toLowerCase();if(!q)return;
+  const btn=document.getElementById('qaBtn');btn.disabled=true;btn.textContent='Analyzing...';
+  setTimeout(()=>{generateAnswer(q);btn.disabled=false;btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Analyze`;},450);
+}
+
+function generateAnswer(q){
+  const data=filteredData,cd=data.filter(r=>r.churnLabel==='Yes');
+  let ans='',metrics=[],cdata=null;
+
+  if(q.includes('city')||q.includes('location')||q.includes('geographic')||q.includes('where')){
+    const cs={};data.forEach(r=>{if(!r.city)return;if(!cs[r.city])cs[r.city]={t:0,c:0};cs[r.city].t++;if(r.churnLabel==='Yes')cs[r.city].c++;});
+    const top=Object.entries(cs).map(([n,v])=>({name:n,...v,rate:v.t>0?(v.c/v.t*100):0})).filter(c=>c.t>=5).sort((a,b)=>b.rate-a.rate);
+    const topVol=Object.entries(cs).map(([n,v])=>({name:n,...v})).sort((a,b)=>b.c-a.c).slice(0,5);
+    const t5Pct=cd.length>0?(topVol.reduce((s,c)=>s+c.c,0)/cd.length*100).toFixed(0):0;
+    ans=`Geographic analysis: churn is <strong>widespread but volume-concentrated</strong>. Top 5 cities — <strong>${topVol.map(c=>c.name).join(', ')}</strong> — account for <strong>${t5Pct}%</strong> of churned customers. The highest churn <em>rate</em> city is <strong>${top[0]?.name||'N/A'}</strong> at <strong>${top[0]?.rate.toFixed(1)||0}%</strong>. The root cause is systemic (contract type, pricing, competition) not geographic — but local campaigns in hotspot cities accelerate retention impact.`;
+    metrics=[{val:top.filter(c=>c.rate>35).length,label:'High-Rate Cities'},{val:topVol[0]?.name||'—',label:'Top Volume City'},{val:(top[0]?.rate.toFixed(1)||0)+'%',label:'Highest Rate'}];
+    cdata={type:'bar',labels:topVol.map(c=>c.name),values:topVol.map(c=>c.c),colors:[P.red,P.orange,P.amber,P.blue,P.purple]};
+  } else if(q.includes('reason')||q.includes('driver')||q.includes('why')||q.includes('cause')){
+    const reasons={};cd.forEach(r=>{if(r.churnReason)reasons[r.churnReason]=(reasons[r.churnReason]||0)+1;});
+    const top3=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const cats={};cd.forEach(r=>{const c=REASON_CATS[r.churnReason]||'Unknown';cats[c]=(cats[c]||0)+1;});
+    const compCount=(cats['Competitive']||0),compPct=cd.length>0?(compCount/cd.length*100).toFixed(0):0;
+    ans=`<strong>${compPct}% of churn is competitively driven</strong>. Top reasons: (1) <strong>"${top3[0]?.[0]||'—'}"</strong> (${top3[0]?.[1]||0}), (2) <strong>"${top3[1]?.[0]||'—'}"</strong> (${top3[1]?.[1]||0}), (3) <strong>"${top3[2]?.[0]||'—'}"</strong>. Scroll up to the Retention Playbook for specific countermeasures for each driver.`;
+    const top8=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    metrics=top3.map(([k,v])=>({val:v,label:k.slice(0,20)}));
+    cdata={type:'bar',labels:top8.map(([k])=>k),values:top8.map(([,v])=>v),colors:top8.map(([k])=>CAT_COLORS[REASON_CATS[k]]||P.blue),horizontal:true};
+  } else if(q.includes('reduc')||q.includes('prevent')||q.includes('retain')||q.includes('remedy')||q.includes('how')){
+    ans=`Top 5 highest-ROI retention actions: (1) <strong>Contract migration</strong> — incentivize M2M customers to switch to annual (2 months free); (2) <strong>Competitive price-match</strong> — proactive counter-offers for fiber/high-ARPU customers; (3) <strong>90-day onboarding program</strong> — structured touchpoints at months 1, 2, 3; (4) <strong>Support quality uplift</strong> — "Attitude of support person" is the #1 stated driver; (5) <strong>Bill shock prevention</strong> — charge alerts reduce involuntary churn. See the Retention Playbook section for full details.`;
+    metrics=[{val:'88%',label:'M2M Rev Risk'},{val:'#1',label:'Support Attitude'},{val:'5x',label:'Retention ROI'}];
+  } else if(q.includes('fiber')||q.includes('internet')){
+    const fT=data.filter(r=>r.internetSvc==='Fiber optic').length;
+    const fC=data.filter(r=>r.churnLabel==='Yes'&&r.internetSvc==='Fiber optic').length;
+    const dT=data.filter(r=>r.internetSvc==='DSL').length;
+    const dC=data.filter(r=>r.churnLabel==='Yes'&&r.internetSvc==='DSL').length;
+    ans=`Fiber optic churn rate: <strong>${fT>0?(fC/fT*100).toFixed(1):0}%</strong> vs DSL: <strong>${dT>0?(dC/dT*100).toFixed(1):0}%</strong>. Fiber customers are more price-sensitive (higher bills), heavily targeted by competitors, and mostly on M2M contracts. Remedies: fiber-specific loyalty offers, speed guarantee SLAs, and lock-in discounts.`;
+    metrics=[{val:fC,label:'Fiber Churned'},{val:(fT>0?(fC/fT*100).toFixed(1):0)+'%',label:'Fiber Rate'},{val:(dT>0?(dC/dT*100).toFixed(1):0)+'%',label:'DSL Rate'}];
+    const gi=churnBy(data,'internetSvc');const iS=[...new Set(data.map(r=>r.internetSvc).filter(Boolean))].sort();
+    cdata={type:'bar',labels:iS,values:iS.map(s=>gi[s]||0),colors:INTERNET_C};
+  } else if(q.includes('contract')||q.includes('compare')){
+    const gc=churnBy(data,'contract'),ga=allBy(data,'contract');
+    const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+    const rates=co.map(c=>ga[c]>0?((gc[c]||0)/ga[c]*100).toFixed(1):0);
+    ans=`Contract type is the <strong>strongest predictor of churn</strong>. Rates: ${co.map((c,i)=>`${c}: <strong>${rates[i]}%</strong>`).join(' · ')}. The difference confirms that commitment-based pricing is the most effective structural retention lever.`;
+    metrics=co.map((c,i)=>({val:rates[i]+'%',label:c}));
+    const cc=co.map((_,i)=>CONTRACT_C[i%CONTRACT_C.length]);
+    cdata={type:'bar',labels:co,values:co.map(c=>gc[c]||0),colors:cc};
+  } else if(q.includes('revenue')||q.includes('risk')){
+    const rv={};cd.forEach(r=>{rv[r.contract]=(rv[r.contract]||0)+r.monthlyCharge;});
+    const tot=Object.values(rv).reduce((a,b)=>a+b,0);
+    ans=`Monthly revenue at risk: <strong>₹${tot.toLocaleString(undefined,{maximumFractionDigits:0})}</strong> from ${cd.length} churned customers. Annualized: <strong>₹${(tot*12/1000).toFixed(1)}K</strong>. Focus on high-ARPU churners — saving even 20% would recover ₹${(tot*0.2/1000).toFixed(1)}K/month.`;
+    const co=[...new Set(data.map(r=>r.contract).filter(Boolean))].sort();
+    const cc=co.map((_,i)=>CONTRACT_C[i%CONTRACT_C.length]);
+    metrics=[{val:'₹'+(tot/1000).toFixed(1)+'K',label:'Monthly'},{val:'₹'+(tot*12/1000).toFixed(1)+'K',label:'Annual'},{val:cd.length,label:'Churned'}];
+    cdata={type:'bar',labels:co,values:co.map(c=>+(rv[c]||0).toFixed(0)),colors:cc};
+  } else if(q.includes('tenure')){
+    const tg={},tA={};
+    data.forEach(r=>{if(!colMap.tenure)return;const g=tenG(r.tenure);tA[g]=(tA[g]||0)+1;if(r.churnLabel==='Yes')tg[g]=(tg[g]||0)+1;});
+    const order=['0–12 Mo','13–24 Mo','25–48 Mo','48+ Mo'];
+    const rates=order.map(g=>tA[g]>0?((tg[g]||0)/tA[g]*100).toFixed(1):0);
+    ans=`Tenure analysis: <strong>0–12 month customers churn at ${rates[0]}%</strong> vs ${rates[3]}% for 48+ months. The 12-month mark is the critical threshold — customers who pass it are significantly more loyal.`;
+    metrics=order.map((g,i)=>({val:rates[i]+'%',label:g}));
+    cdata={type:'bar',labels:order,values:order.map(g=>tg[g]||0),colors:TENURE_C};
+  } else {
+    const k=computeKPIs(data);
+    ans=`Dataset: <strong>${k.total.toLocaleString()} customers</strong>, <strong>${k.churnRate.toFixed(2)}%</strong> churn rate, <strong>₹${(k.revRisk/1000).toFixed(1)}K</strong>/month at risk. Try asking about: <em>churn reasons, location hotspots, how to reduce churn, fiber optic, revenue risk, contract types, or tenure analysis.</em>`;
+    metrics=[{val:k.total.toLocaleString(),label:'Total'},{val:k.churnRate.toFixed(1)+'%',label:'Churn Rate'},{val:'₹'+(k.revRisk/1000).toFixed(1)+'K',label:'At Risk'}];
+  }
+
+  document.getElementById('qaResponseText').innerHTML=ans;
+  document.getElementById('qaMetrics').innerHTML=metrics.map(m=>`<div class="qa-metric"><div class="qa-metric-val">${m.val}</div><div class="qa-metric-label">${m.label}</div></div>`).join('');
+  const cw=document.getElementById('qaChartWrap');
+  if(cdata){
+    cw.style.display='block';cw.classList.add('visible');
+    if(qaChart){qaChart.destroy();qaChart=null;}
+    qaChart=new Chart(document.getElementById('qaChart'),{type:cdata.type,data:{labels:cdata.labels,datasets:[{data:cdata.values,backgroundColor:cdata.colors.map(c=>(c||P.blue)+'99'),borderColor:cdata.colors.map(c=>c||P.blue),borderWidth:2,borderRadius:cdata.type!=='doughnut'?5:0,hoverOffset:6}]},options:{indexAxis:cdata.horizontal?'y':'x',responsive:true,maintainAspectRatio:false,cutout:cdata.type==='doughnut'?'55%':undefined,plugins:{legend:{display:cdata.type==='doughnut',labels:{boxWidth:10,font:{size:10},color:'#7a8ba8'}},tooltip:TTP},scales:cdata.type!=='doughnut'?{x:{grid:{color:'rgba(30,45,69,0.5)'}},y:{grid:{color:'rgba(30,45,69,0.5)'}}}:undefined}});
+  }else{cw.style.display='none';cw.classList.remove('visible');}
+  document.getElementById('qaResponse').classList.add('visible');
+  document.getElementById('qaResponse').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+window.addEventListener('resize',()=>{if(rawData.length)updateLocationSection(filteredData);});
+</script>
+</body>
+</html>
